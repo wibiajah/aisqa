@@ -1,398 +1,594 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 
-type Photo = {
+type AccountType = "aset" | "liabilitas" | "ekuitas" | "pendapatan" | "beban";
+type Tab = "dashboard" | "jurnal" | "buku-besar" | "laporan";
+
+type Account = {
+  code: string;
+  name: string;
+  type: AccountType;
+  normal: "debit" | "kredit";
+};
+
+type JournalEntry = {
   id: string;
-  title: string;
-  src: string;
-  createdAt: string;
+  date: string;
+  description: string;
+  debitAccount: string;
+  creditAccount: string;
+  amount: number;
 };
 
-type Note = {
-  id: string;
-  title: string;
-  body: string;
-  type: "catatan" | "tugas" | "janji";
-  createdAt: string;
+const storageKey = "akuntansi-kuliah-v2";
+
+const accounts: Account[] = [
+  { code: "101", name: "Kas", type: "aset", normal: "debit" },
+  { code: "102", name: "Bank", type: "aset", normal: "debit" },
+  { code: "103", name: "Piutang Usaha", type: "aset", normal: "debit" },
+  { code: "121", name: "Peralatan", type: "aset", normal: "debit" },
+  { code: "201", name: "Utang Usaha", type: "liabilitas", normal: "kredit" },
+  { code: "301", name: "Modal Pemilik", type: "ekuitas", normal: "kredit" },
+  { code: "401", name: "Pendapatan Jasa", type: "pendapatan", normal: "kredit" },
+  { code: "501", name: "Beban Sewa", type: "beban", normal: "debit" },
+  { code: "502", name: "Beban Listrik", type: "beban", normal: "debit" },
+  { code: "503", name: "Beban Gaji", type: "beban", normal: "debit" },
+];
+
+const initialEntries: JournalEntry[] = [];
+
+const accountTypeLabels: Record<AccountType, string> = {
+  aset: "Aset",
+  liabilitas: "Liabilitas",
+  ekuitas: "Ekuitas",
+  pendapatan: "Pendapatan",
+  beban: "Beban",
 };
 
-type Mood = "ceria" | "badmood" | "bt" | "kangen";
+function rupiah(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
-const storageKey = "aisqa-world-v1";
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
 
-const defaultPhotos: Photo[] = [
-  {
-    id: "molly",
-    title: "Molly",
-    src: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "mountain",
-    title: "Rencana naik gunung",
-    src: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const defaultNotes: Note[] = [
-  {
-    id: "serius",
-    title: "Catatan dari aku",
-    body: "Aku buat tempat ini supaya ada ruang yang rapi untuk menyimpan hal-hal penting tentang kamu dan tentang kita.",
-    type: "janji",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "kuliah",
-    title: "Kuliah",
-    body: "Tempat menyimpan catatan, tugas, deadline, atau hal kecil yang perlu diingat.",
-    type: "tugas",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const favorites = [
-  "Molly",
-  "kucing",
-  "susu coklat",
-  "matcha",
-  "seblak",
-  "merah",
-  "biru",
-  "naik gunung",
-];
-
-const moodCopy: Record<Mood, string> = {
-  ceria: "Hari ini lagi enak. Semoga sisanya juga lancar.",
-  badmood: "Kalau lagi kurang mood, pelan-pelan aja dulu.",
-  bt: "Kalau lagi BT, ambil jeda sebentar.",
-  kangen: "Kalau lagi kangen, simpan foto atau catatan kecil di sini.",
-};
+function getAccount(code: string) {
+  return accounts.find((account) => account.code === code) ?? accounts[0];
+}
 
 export default function Home() {
-  const [photos, setPhotos] = useState<Photo[]>(defaultPhotos);
-  const [notes, setNotes] = useState<Note[]>(defaultNotes);
-  const [mood, setMood] = useState<Mood>("ceria");
-  const [photoTitle, setPhotoTitle] = useState("");
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteBody, setNoteBody] = useState("");
-  const [noteType, setNoteType] = useState<Note["type"]>("catatan");
-  const [activePhoto, setActivePhoto] = useState<Photo | null>(null);
+  const [entries, setEntries] = useState<JournalEntry[]>(initialEntries);
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [date, setDate] = useState("2026-05-30");
+  const [description, setDescription] = useState("");
+  const [debitAccount, setDebitAccount] = useState("101");
+  const [creditAccount, setCreditAccount] = useState("401");
+  const [amount, setAmount] = useState("");
 
   useEffect(() => {
-    const loadStoredData = window.setTimeout(() => {
+    const timeout = window.setTimeout(() => {
       const stored = localStorage.getItem(storageKey);
       if (!stored) {
         return;
       }
 
       try {
-        const parsed = JSON.parse(stored) as { photos?: Photo[]; notes?: Note[] };
-        setPhotos(parsed.photos?.length ? parsed.photos : defaultPhotos);
-        setNotes(parsed.notes?.length ? parsed.notes : defaultNotes);
+        const parsed = JSON.parse(stored) as JournalEntry[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEntries(parsed);
+        }
       } catch {
         localStorage.removeItem(storageKey);
       }
     }, 0);
 
-    return () => window.clearTimeout(loadStoredData);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ photos, notes }));
-  }, [photos, notes]);
+    localStorage.setItem(storageKey, JSON.stringify(entries));
+  }, [entries]);
 
-  const stats = useMemo(
-    () => [
-      { label: "Foto", value: photos.length },
-      { label: "Catatan", value: notes.length },
-      { label: "Janji", value: notes.filter((note) => note.type === "janji").length },
-    ],
-    [notes, photos],
+  const sortedEntries = useMemo(
+    () => [...entries].sort((first, second) => first.date.localeCompare(second.date)),
+    [entries],
   );
 
-  function addPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+  const accountBalances = useMemo(() => {
+    return accounts.map((account) => {
+      const debit = entries
+        .filter((entry) => entry.debitAccount === account.code)
+        .reduce((total, entry) => total + entry.amount, 0);
+      const credit = entries
+        .filter((entry) => entry.creditAccount === account.code)
+        .reduce((total, entry) => total + entry.amount, 0);
+      const balance = account.normal === "debit" ? debit - credit : credit - debit;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotos((current) => [
-        {
-          id: crypto.randomUUID(),
-          title: photoTitle || file.name,
-          src: String(reader.result),
-          createdAt: new Date().toISOString(),
-        },
-        ...current,
-      ]);
-      setPhotoTitle("");
-      event.target.value = "";
+      return { ...account, debit, credit, balance };
+    });
+  }, [entries]);
+
+  const summary = useMemo(() => {
+    const byType = (type: AccountType) =>
+      accountBalances
+        .filter((account) => account.type === type)
+        .reduce((total, account) => total + account.balance, 0);
+
+    const totalDebit = entries.reduce((total, entry) => total + entry.amount, 0);
+    const totalCredit = entries.reduce((total, entry) => total + entry.amount, 0);
+    const revenue = byType("pendapatan");
+    const expenses = byType("beban");
+    const netIncome = revenue - expenses;
+
+    return {
+      assets: byType("aset"),
+      liabilities: byType("liabilitas"),
+      equity: byType("ekuitas"),
+      revenue,
+      expenses,
+      netIncome,
+      totalDebit,
+      totalCredit,
+      equationRight: byType("liabilitas") + byType("ekuitas") + netIncome,
     };
-    reader.readAsDataURL(file);
-  }
+  }, [accountBalances, entries]);
 
-  function addNote(event: FormEvent<HTMLFormElement>) {
+  function addEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!noteTitle.trim() || !noteBody.trim()) {
+    const numericAmount = Number(amount);
+
+    if (!description.trim() || !numericAmount || numericAmount <= 0) {
       return;
     }
 
-    setNotes((current) => [
+    setEntries((current) => [
       {
         id: crypto.randomUUID(),
-        title: noteTitle.trim(),
-        body: noteBody.trim(),
-        type: noteType,
-        createdAt: new Date().toISOString(),
+        date,
+        description: description.trim(),
+        debitAccount,
+        creditAccount,
+        amount: numericAmount,
       },
       ...current,
     ]);
-    setNoteTitle("");
-    setNoteBody("");
-    setNoteType("catatan");
+    setDescription("");
+    setAmount("");
+    setActiveTab("jurnal");
   }
 
-  function removePhoto(id: string) {
-    setPhotos((current) => current.filter((photo) => photo.id !== id));
+  function deleteEntry(id: string) {
+    setEntries((current) => current.filter((entry) => entry.id !== id));
   }
 
-  function removeNote(id: string) {
-    setNotes((current) => current.filter((note) => note.id !== id));
+  function clearEntries() {
+    setEntries(initialEntries);
+    setActiveTab("dashboard");
   }
+
+  const trialBalanceDebit = accountBalances.reduce(
+    (total, account) => total + (account.normal === "debit" ? account.balance : 0),
+    0,
+  );
+  const trialBalanceCredit = accountBalances.reduce(
+    (total, account) => total + (account.normal === "kredit" ? account.balance : 0),
+    0,
+  );
 
   return (
-    <main className="min-h-screen bg-[#fff7fb] text-[#181016]">
-      <section className="relative overflow-hidden bg-[#b40f2f] text-white">
-        <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(135deg,#ffffff_1px,transparent_1px),linear-gradient(45deg,#2f68ff_1px,transparent_1px)] [background-size:28px_28px]" />
-        <div className="relative mx-auto grid min-h-[86svh] w-full max-w-6xl content-between px-5 py-5 sm:min-h-[88svh] sm:px-8 sm:py-7 lg:px-10">
-          <nav className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                Untuk
-              </p>
-              <p className="text-base font-bold sm:text-lg">Aisqa Bariqi Shevanska</p>
-            </div>
-            <a
-              href="#ruang-aisqa"
-              className="rounded-[8px] bg-white px-4 py-2 text-sm font-bold text-[#b40f2f] shadow-sm transition hover:bg-[#dce8ff]"
-            >
-              Buka
-            </a>
-          </nav>
-
-          <div className="grid gap-5 py-8 sm:gap-8 sm:py-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-            <div className="max-w-3xl">
-              <p className="mb-4 inline-flex rounded-[8px] bg-[#1f5fff] px-3 py-2 text-xs font-semibold text-white sm:text-sm">
-                Molly, matcha, seblak, dan catatan kecil
-              </p>
-              <h1 className="max-w-3xl text-[2.35rem] font-black leading-[1.02] tracking-normal sm:text-6xl lg:text-7xl">
-                Ruang sederhana untuk Aisqa.
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/84 sm:mt-6 sm:text-lg sm:leading-8">
-                Tempat menyimpan foto, tugas, catatan, dan hal-hal kecil yang
-                penting buat kamu.
-              </p>
-            </div>
-
-            <div className="grid gap-3 rounded-[8px] bg-white/12 p-4 backdrop-blur sm:p-5">
-              {stats.map((item) => (
-                <div
-                  className="flex items-center justify-between border-b border-white/18 pb-3 last:border-0 last:pb-0"
-                  key={item.label}
-                >
-                  <span className="text-xs text-white/75 sm:text-sm">{item.label}</span>
-                  <strong className="text-2xl sm:text-3xl">{item.value}</strong>
-                </div>
-              ))}
-            </div>
+    <main className="min-h-screen bg-[#eef3ef] text-[#111814]">
+      <section className="hero-panel">
+        <nav className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-8 sm:py-5">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8eb69c]">
+              Tugas Kuliah
+            </p>
+            <h1 className="text-lg font-black text-white sm:text-2xl">
+              Aplikasi Keuangan Akuntansi
+            </h1>
           </div>
+          <button
+            className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-xs font-black text-[#123424] transition hover:bg-[#c9f2d8] sm:px-4 sm:text-sm"
+            onClick={clearEntries}
+            type="button"
+          >
+            Kosongkan Data
+          </button>
+        </nav>
 
-          <div className="grid grid-cols-2 gap-2 pb-3 sm:grid-cols-4 sm:gap-3">
-            {favorites.map((favorite) => (
-              <span
-                className="rounded-[8px] bg-white/14 px-3 py-2 text-center text-xs font-semibold text-white sm:px-4 sm:text-sm"
-                key={favorite}
-              >
-                {favorite}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section
-        className="mx-auto grid w-full max-w-6xl gap-5 px-5 py-8 sm:px-8 lg:grid-cols-[0.75fr_1.25fr] lg:px-10"
-        id="ruang-aisqa"
-      >
-        <aside className="grid content-start gap-5">
-          <div className="rounded-[8px] border border-[#f1c7d1] bg-white p-5 shadow-sm">
-            <h2 className="text-2xl font-black text-[#b40f2f]">Mood hari ini</h2>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {(["ceria", "badmood", "bt", "kangen"] as Mood[]).map((item) => (
-                <button
-                  className={`rounded-[8px] border px-3 py-3 text-sm font-bold transition ${
-                    mood === item
-                      ? "border-[#1f5fff] bg-[#1f5fff] text-white"
-                      : "border-[#f1c7d1] bg-[#fff7fb] text-[#181016]"
-                  }`}
-                  key={item}
-                  onClick={() => setMood(item)}
-                  type="button"
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <p className="mt-4 rounded-[8px] bg-[#fff1f5] p-4 text-sm leading-6 text-[#5f2837]">
-              {moodCopy[mood]}
+        <div className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-7 pt-3 sm:gap-6 sm:px-8 sm:pb-8 sm:pt-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div>
+            <p className="mb-4 inline-flex rounded-[8px] bg-[#c9f2d8] px-3 py-2 text-sm font-black text-[#123424]">
+              Jurnal umum, buku besar, dan laporan otomatis
+            </p>
+            <h2 className="max-w-2xl text-4xl font-black leading-[0.98] text-white sm:text-6xl lg:text-7xl">
+              Jurnal Catatan Keuangan.
+            </h2>
+            <p className="mt-5 max-w-xl text-sm leading-7 text-white/76 sm:text-base">
+              Catat transaksi debit-kredit, lalu aplikasi menyusun saldo akun,
+              neraca saldo, laba rugi, dan posisi keuangan secara otomatis.
             </p>
           </div>
 
-          <form
-            className="rounded-[8px] border border-[#c7d8ff] bg-white p-5 shadow-sm"
-            onSubmit={addNote}
-          >
-            <h2 className="text-2xl font-black text-[#1f5fff]">Catatan & tugas</h2>
-            <input
-              className="mt-4 w-full rounded-[8px] border border-[#c7d8ff] px-4 py-3 text-sm outline-none focus:border-[#1f5fff]"
-              onChange={(event) => setNoteTitle(event.target.value)}
-              placeholder="Judul"
-              value={noteTitle}
-            />
-            <textarea
-              className="mt-3 min-h-28 w-full rounded-[8px] border border-[#c7d8ff] px-4 py-3 text-sm outline-none focus:border-[#1f5fff]"
-              onChange={(event) => setNoteBody(event.target.value)}
-              placeholder="Isi catatan, tugas, deadline, atau janji"
-              value={noteBody}
-            />
-            <select
-              className="mt-3 w-full rounded-[8px] border border-[#c7d8ff] bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#1f5fff]"
-              onChange={(event) => setNoteType(event.target.value as Note["type"])}
-              value={noteType}
-            >
-              <option value="catatan">Catatan</option>
-              <option value="tugas">Tugas kuliah</option>
-              <option value="janji">Janji</option>
-            </select>
-            <button className="mt-3 w-full rounded-[8px] bg-[#b40f2f] px-4 py-3 text-sm font-black text-white transition hover:bg-[#901026]">
-              Simpan
-            </button>
-          </form>
-        </aside>
-
-        <div className="grid gap-5">
-          <div className="rounded-[8px] border border-[#f1c7d1] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-3xl font-black text-[#b40f2f]">Album Aisqa</h2>
-                <p className="mt-1 text-sm leading-6 text-[#69424d]">
-                  Simpan foto Molly, gunung, kuliah, makanan, atau momen lain.
-                </p>
-              </div>
-              <label className="cursor-pointer rounded-[8px] bg-[#1f5fff] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-[#174bd0]">
-                Upload foto
-                <input accept="image/*" className="sr-only" onChange={addPhoto} type="file" />
-              </label>
+          <div className="ledger-card">
+            <div className="ledger-card-header">
+              <span>Persamaan Dasar Akuntansi</span>
+              <strong>{summary.assets === summary.equationRight ? "Seimbang" : "Periksa"}</strong>
             </div>
-            <input
-              className="mt-4 w-full rounded-[8px] border border-[#f1c7d1] px-4 py-3 text-sm outline-none focus:border-[#b40f2f]"
-              onChange={(event) => setPhotoTitle(event.target.value)}
-              placeholder="Judul foto sebelum upload"
-              value={photoTitle}
-            />
-
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {photos.map((photo) => (
-                <article
-                  className="group overflow-hidden rounded-[8px] border border-[#f1c7d1] bg-[#fff7fb]"
-                  key={photo.id}
+            <div className="accounting-equation">
+              <div>
+                <span>Aset</span>
+                <strong>{rupiah(summary.assets)}</strong>
+              </div>
+              <b>=</b>
+              <div>
+                <span>Liabilitas + Ekuitas + Laba</span>
+                <strong>{rupiah(summary.equationRight)}</strong>
+              </div>
+            </div>
+            <div className="ledger-spine">
+              {accountBalances.slice(0, 6).map((account) => (
+                <span
+                  key={account.code}
+                  style={{ width: `${Math.max(16, Math.min(100, account.balance / 140000))}%` }}
                 >
-                  <button
-                    className="block aspect-square w-full overflow-hidden"
-                    onClick={() => setActivePhoto(photo)}
-                    type="button"
-                  >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                      alt={photo.title}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      src={photo.src}
-                    />
-                  </button>
-                  <div className="grid gap-2 p-3">
-                    <p className="line-clamp-2 min-h-10 text-sm font-bold text-[#321821]">
-                      {photo.title}
-                    </p>
-                    <button
-                      className="justify-self-start text-xs font-bold text-[#b40f2f]"
-                      onClick={() => removePhoto(photo.id)}
-                      type="button"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </article>
+                  {account.name}
+                </span>
               ))}
             </div>
-          </div>
-
-          <div className="grid gap-3">
-            {notes.map((note) => (
-              <article
-                className="rounded-[8px] border border-[#c7d8ff] bg-white p-5 shadow-sm"
-                key={note.id}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="rounded-full bg-[#dce8ff] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#1f5fff]">
-                      {note.type}
-                    </span>
-                    <h3 className="mt-3 text-xl font-black text-[#181016]">{note.title}</h3>
-                  </div>
-                  <button
-                    className="shrink-0 rounded-full border border-[#f1c7d1] px-3 py-1 text-xs font-bold text-[#b40f2f]"
-                    onClick={() => removeNote(note.id)}
-                    type="button"
-                  >
-                    Hapus
-                  </button>
-                </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#5f2837]">
-                  {note.body}
-                </p>
-              </article>
-            ))}
           </div>
         </div>
       </section>
 
-      {activePhoto ? (
-        <div className="fixed inset-0 z-20 grid place-items-center bg-[#181016]/80 p-4">
-          <div className="max-h-[90svh] w-full max-w-3xl overflow-hidden rounded-[8px] bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={activePhoto.title}
-              className="max-h-[72svh] w-full object-contain bg-black"
-              src={activePhoto.src}
-            />
-            <div className="flex items-center justify-between gap-4 p-4">
-              <p className="font-bold text-[#181016]">{activePhoto.title}</p>
-              <button
-                className="rounded-[8px] bg-[#b40f2f] px-4 py-2 text-sm font-black text-white"
-                onClick={() => setActivePhoto(null)}
-                type="button"
+      <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-5 sm:gap-5 sm:px-8 sm:py-6 lg:grid-cols-[360px_1fr]">
+        <aside className="grid content-start gap-5">
+          <form className="panel" onSubmit={addEntry}>
+            <div className="mb-4">
+              <p className="eyebrow">Input Transaksi</p>
+              <h2 className="section-title">Jurnal Baru</h2>
+            </div>
+
+            <label className="field-label">
+              Tanggal
+              <input
+                className="field"
+                onChange={(event) => setDate(event.target.value)}
+                type="date"
+                value={date}
+              />
+            </label>
+
+            <label className="field-label">
+              Keterangan
+              <input
+                className="field"
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Contoh: menerima pendapatan jasa"
+                value={description}
+              />
+            </label>
+
+            <label className="field-label">
+              Akun Debit
+              <select
+                className="field"
+                onChange={(event) => setDebitAccount(event.target.value)}
+                value={debitAccount}
               >
-                Tutup
-              </button>
+                {accounts.map((account) => (
+                  <option key={account.code} value={account.code}>
+                    {account.code} - {account.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-label">
+              Akun Kredit
+              <select
+                className="field"
+                onChange={(event) => setCreditAccount(event.target.value)}
+                value={creditAccount}
+              >
+                {accounts.map((account) => (
+                  <option key={account.code} value={account.code}>
+                    {account.code} - {account.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-label">
+              Nominal
+              <input
+                className="field"
+                min="0"
+                onChange={(event) => setAmount(event.target.value)}
+                placeholder="Contoh: 1500000"
+                type="number"
+                value={amount}
+              />
+            </label>
+
+            <button className="primary-button" type="submit">
+              Simpan Jurnal
+            </button>
+          </form>
+
+          <div className="panel">
+            <p className="eyebrow">Ringkasan</p>
+            <div className="metric-list">
+              <div>
+                <span>Total Debit</span>
+                <strong>{rupiah(summary.totalDebit)}</strong>
+              </div>
+              <div>
+                <span>Total Kredit</span>
+                <strong>{rupiah(summary.totalCredit)}</strong>
+              </div>
+              <div>
+                <span>Laba Bersih</span>
+                <strong className={summary.netIncome >= 0 ? "text-[#14783d]" : "text-[#b42318]"}>
+                  {rupiah(summary.netIncome)}
+                </strong>
+              </div>
             </div>
           </div>
+        </aside>
+
+        <div className="grid gap-5">
+          <div
+            className="app-tabs"
+            style={{
+              alignItems: "center",
+              display: "flex",
+              gap: 6,
+              height: 50,
+              maxHeight: 50,
+              minHeight: 50,
+              overflowX: "auto",
+              padding: 6,
+            }}
+          >
+            {[
+              ["dashboard", "Dashboard"],
+              ["jurnal", "Jurnal Umum"],
+              ["buku-besar", "Buku Besar"],
+              ["laporan", "Laporan"],
+            ].map(([tab, label]) => (
+              <button
+                className={activeTab === tab ? "is-active" : ""}
+                key={tab}
+                onClick={() => setActiveTab(tab as Tab)}
+                style={{
+                  alignItems: "center",
+                  display: "flex",
+                  height: 38,
+                  justifyContent: "center",
+                  maxHeight: 38,
+                  minHeight: 38,
+                  padding: "0 12px",
+                }}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "dashboard" ? (
+            <div className="grid gap-5">
+              <div className="grid gap-4 md:grid-cols-4">
+                {[
+                  ["Aset", summary.assets],
+                  ["Liabilitas", summary.liabilities],
+                  ["Ekuitas", summary.equity],
+                  ["Laba Bersih", summary.netIncome],
+                ].map(([label, value]) => (
+                  <div className="stat-card" key={label}>
+                    <span>{label}</span>
+                    <strong>{rupiah(Number(value))}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="panel">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="eyebrow">Aktivitas</p>
+                    <h2 className="section-title">Transaksi Terbaru</h2>
+                  </div>
+                  <button className="ghost-button" onClick={() => setActiveTab("jurnal")} type="button">
+                    Lihat Jurnal
+                  </button>
+                </div>
+                <div className="timeline">
+                  {sortedEntries.length > 0 ? sortedEntries.slice(-5).reverse().map((entry) => (
+                    <article key={entry.id}>
+                      <time>{formatDate(entry.date)}</time>
+                      <div>
+                        <strong>{entry.description}</strong>
+                        <p>
+                          Debit {getAccount(entry.debitAccount).name} dan kredit{" "}
+                          {getAccount(entry.creditAccount).name}
+                        </p>
+                      </div>
+                      <span>{rupiah(entry.amount)}</span>
+                    </article>
+                  )) : (
+                    <div className="empty-state">Belum ada transaksi. Isi jurnal baru dari form di sebelah kiri.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === "jurnal" ? (
+            <div className="panel">
+              <div className="mb-4">
+                <p className="eyebrow">Double Entry</p>
+                <h2 className="section-title">Jurnal Umum</h2>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tanggal</th>
+                      <th>Keterangan</th>
+                      <th>Akun</th>
+                      <th>Debit</th>
+                      <th>Kredit</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedEntries.map((entry) => (
+                      <Fragment key={entry.id}>
+                        <tr key={`${entry.id}-debit`}>
+                          <td>{formatDate(entry.date)}</td>
+                          <td>{entry.description}</td>
+                          <td>{getAccount(entry.debitAccount).name}</td>
+                          <td>{rupiah(entry.amount)}</td>
+                          <td>-</td>
+                          <td rowSpan={2}>
+                            <button className="delete-button" onClick={() => deleteEntry(entry.id)} type="button">
+                              Hapus
+                            </button>
+                          </td>
+                        </tr>
+                        <tr key={`${entry.id}-credit`}>
+                          <td></td>
+                          <td></td>
+                          <td className="credit-account">{getAccount(entry.creditAccount).name}</td>
+                          <td>-</td>
+                          <td>{rupiah(entry.amount)}</td>
+                        </tr>
+                      </Fragment>
+                    ))}
+                    {sortedEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>Belum ada transaksi jurnal.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === "buku-besar" ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {accountBalances.map((account) => (
+                <article className="ledger-account" key={account.code}>
+                  <div className="ledger-account-head">
+                    <div>
+                      <span>{account.code}</span>
+                      <h3>{account.name}</h3>
+                    </div>
+                    <strong>{rupiah(account.balance)}</strong>
+                  </div>
+                  <div className="mini-ledger">
+                    <span>Debit {rupiah(account.debit)}</span>
+                    <span>Kredit {rupiah(account.credit)}</span>
+                  </div>
+                  <p>{accountTypeLabels[account.type]} - saldo normal {account.normal}</p>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {activeTab === "laporan" ? (
+            <div className="grid gap-5">
+              <div className="panel">
+                <p className="eyebrow">Laporan</p>
+                <h2 className="section-title">Neraca Saldo</h2>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Kode</th>
+                        <th>Akun</th>
+                        <th>Debit</th>
+                        <th>Kredit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accountBalances.map((account) => (
+                        <tr key={account.code}>
+                          <td>{account.code}</td>
+                          <td>{account.name}</td>
+                          <td>{account.normal === "debit" ? rupiah(account.balance) : "-"}</td>
+                          <td>{account.normal === "kredit" ? rupiah(account.balance) : "-"}</td>
+                        </tr>
+                      ))}
+                      <tr className="total-row">
+                        <td></td>
+                        <td>Total</td>
+                        <td>{rupiah(trialBalanceDebit)}</td>
+                        <td>{rupiah(trialBalanceCredit)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="panel">
+                  <p className="eyebrow">Laporan</p>
+                  <h2 className="section-title">Laba Rugi</h2>
+                  <div className="report-list">
+                    <div>
+                      <span>Pendapatan</span>
+                      <strong>{rupiah(summary.revenue)}</strong>
+                    </div>
+                    <div>
+                      <span>Beban</span>
+                      <strong>{rupiah(summary.expenses)}</strong>
+                    </div>
+                    <div className="report-total">
+                      <span>Laba Bersih</span>
+                      <strong>{rupiah(summary.netIncome)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <p className="eyebrow">Laporan</p>
+                  <h2 className="section-title">Posisi Keuangan</h2>
+                  <div className="report-list">
+                    <div>
+                      <span>Total Aset</span>
+                      <strong>{rupiah(summary.assets)}</strong>
+                    </div>
+                    <div>
+                      <span>Liabilitas</span>
+                      <strong>{rupiah(summary.liabilities)}</strong>
+                    </div>
+                    <div>
+                      <span>Ekuitas + Laba</span>
+                      <strong>{rupiah(summary.equity + summary.netIncome)}</strong>
+                    </div>
+                    <div className="report-total">
+                      <span>Status</span>
+                      <strong>{summary.assets === summary.equationRight ? "Seimbang" : "Belum seimbang"}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </section>
     </main>
   );
 }

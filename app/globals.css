@@ -1,30 +1,596 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff7fb;
-  --foreground: #181016;
+  --background: #eef3ef;
+  --foreground: #111814;
+  --ink: #123424;
+  --mint: #c9f2d8;
+  --line: #d8e4dc;
+  --muted: #65746b;
+  --panel: #ffffff;
+  --danger: #b42318;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta);
+  --font-display: var(--font-syne);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-jakarta), Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 button,
 input,
-textarea,
 select {
   font: inherit;
 }
 
-html {
-  scroll-behavior: smooth;
+.hero-panel {
+  background:
+    radial-gradient(circle at 82% 16%, rgb(201 242 216 / 18%), transparent 28%),
+    radial-gradient(circle at 8% 86%, rgb(142 182 156 / 24%), transparent 30%),
+    linear-gradient(135deg, #0f2b1f, #154533 58%, #10281d);
+  color: white;
+}
+
+.ledger-card {
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 14%), rgb(255 255 255 / 6%)),
+    repeating-linear-gradient(0deg, transparent, transparent 22px, rgb(255 255 255 / 5%) 23px);
+  padding: 20px;
+  box-shadow: 0 28px 70px rgb(0 0 0 / 20%);
+  backdrop-filter: blur(12px);
+}
+
+.ledger-card-header,
+.accounting-equation,
+.metric-list div,
+.report-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ledger-card-header span,
+.eyebrow {
+  color: #6e9b7e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ledger-card-header strong {
+  border-radius: 999px;
+  background: var(--mint);
+  padding: 6px 10px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.accounting-equation {
+  margin-top: 22px;
+}
+
+.accounting-equation div {
+  flex: 1;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 8%);
+  padding: 16px;
+}
+
+.accounting-equation span,
+.stat-card span,
+.metric-list span,
+.report-list span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.accounting-equation span {
+  color: rgb(255 255 255 / 64%);
+}
+
+.accounting-equation strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 950;
+}
+
+.accounting-equation b {
+  color: var(--mint);
+  font-size: 30px;
+}
+
+.ledger-spine {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ledger-spine span {
+  min-width: 130px;
+  border-radius: 999px;
+  background: var(--mint);
+  padding: 7px 10px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+  transition: width 260ms ease;
+}
+
+.panel,
+.stat-card,
+.ledger-account {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 18px 40px rgb(18 52 36 / 7%);
+}
+
+.panel {
+  padding: 20px;
+}
+
+.section-title {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.field-label {
+  display: grid;
+  gap: 7px;
+  margin-top: 13px;
+  color: #31463a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fbf9;
+  padding: 12px 13px;
+  color: var(--foreground);
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.field:focus {
+  border-color: #3a8f5d;
+  background: white;
+  box-shadow: 0 0 0 4px rgb(58 143 93 / 12%);
+}
+
+.primary-button,
+.ghost-button,
+.delete-button {
+  border-radius: 10px;
+  font-weight: 950;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.primary-button {
+  width: 100%;
+  margin-top: 14px;
+  background: var(--ink);
+  padding: 13px;
+  color: white;
+}
+
+.primary-button:hover,
+.ghost-button:hover,
+.delete-button:hover,
+.app-tabs button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:hover {
+  box-shadow: 0 14px 30px rgb(18 52 36 / 18%);
+}
+
+.ghost-button {
+  border: 1px solid var(--line);
+  background: #f8fbf9;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.delete-button {
+  border: 1px solid #f6c9c5;
+  background: #fff7f6;
+  padding: 8px 10px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.metric-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.metric-list div,
+.report-list div {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.metric-list div:last-child,
+.report-list div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.metric-list strong,
+.report-list strong {
+  color: var(--ink);
+  text-align: right;
+  font-size: 15px;
+}
+
+.app-tabs {
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  padding: 6px;
+  box-shadow: 0 18px 40px rgb(18 52 36 / 6%);
+}
+
+.app-tabs button {
+  flex: 0 0 auto;
+  min-width: 112px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.app-tabs button.is-active {
+  background: var(--ink);
+  color: white;
+}
+
+.stat-card {
+  padding: 18px;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 950;
+}
+
+.timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline article {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbf9;
+  padding: 13px;
+}
+
+.timeline time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.timeline strong {
+  color: var(--ink);
+}
+
+.timeline p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.timeline article > span {
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: #f8fbf9;
+  padding: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+th {
+  background: #f3f8f5;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+thead th:first-child {
+  border-top-left-radius: 12px;
+}
+
+thead th:last-child {
+  border-top-right-radius: 12px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 13px 12px;
+  vertical-align: top;
+}
+
+td {
+  color: #223229;
+  font-size: 14px;
+}
+
+.credit-account {
+  padding-left: 34px;
+  color: var(--muted);
+}
+
+.total-row td {
+  background: #f3f8f5;
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.ledger-account {
+  padding: 18px;
+}
+
+.ledger-account-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.ledger-account-head span {
+  color: #3a8f5d;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ledger-account h3 {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.ledger-account-head strong {
+  color: var(--ink);
+  text-align: right;
+}
+
+.mini-ledger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mini-ledger span {
+  border-radius: 10px;
+  background: #f3f8f5;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ledger-account p {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.report-total {
+  border-radius: 12px;
+  background: var(--ink);
+  padding: 14px;
+}
+
+.report-total span,
+.report-total strong {
+  color: white;
+}
+
+@media (max-width: 760px) {
+  .hero-panel {
+    background:
+      radial-gradient(circle at 92% 8%, rgb(201 242 216 / 14%), transparent 34%),
+      linear-gradient(160deg, #10281d, #154533);
+  }
+
+  .ledger-card {
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .ledger-card-header {
+    display: grid;
+    gap: 8px;
+  }
+
+  .accounting-equation,
+  .ledger-card-header {
+    align-items: stretch;
+  }
+
+  .accounting-equation {
+    display: grid;
+  }
+
+  .accounting-equation b {
+    text-align: center;
+  }
+
+  .app-tabs {
+    top: 4px;
+    margin-inline: -4px;
+    border-radius: 10px;
+    scrollbar-width: none;
+  }
+
+  .app-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-tabs button {
+    flex: 0 0 auto;
+    min-width: 96px;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+
+  .panel,
+  .stat-card,
+  .ledger-account {
+    border-radius: 12px;
+    box-shadow: 0 12px 26px rgb(18 52 36 / 6%);
+  }
+
+  .panel {
+    padding: 15px;
+  }
+
+  .section-title {
+    font-size: 21px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card strong {
+    font-size: 17px;
+    word-break: break-word;
+  }
+
+  .timeline article {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .timeline article > span {
+    justify-self: start;
+  }
+
+  .metric-list div,
+  .report-list div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .metric-list strong,
+  .report-list strong {
+    text-align: left;
+  }
+
+  .mini-ledger {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    min-width: 680px;
+  }
+
+  th,
+  td {
+    padding: 11px 10px;
+  }
+}
+
+@media (min-width: 1024px) {
+  aside {
+    position: sticky;
+    top: 16px;
+  }
 }
